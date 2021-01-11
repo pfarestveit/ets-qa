@@ -6,6 +6,7 @@ require_relative '../util/spec_helper'
 
 begin
 
+  OecUtils.prepare_dept_confirmation OECDepartments::THEATER
   OecUtils.prepare_merged_confirmations
 
 end

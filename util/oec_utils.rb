@@ -52,6 +52,46 @@ class OecUtils
     File.join(ENV['HOME'], "/OEC/#{@config['oec']['term']}")
   end
 
+  def self.prepare_dept_confirmation(dept)
+    file_name = File.join("#{term_folder}", "/Step 2 department confirmation/#{dept.dept_name} - Courses.csv")
+    user = oec_user
+    initial_csv = CSV.read(file_name, headers: true)
+    CSV.open(file_name, 'wb') do |updated_csv|
+      updated_csv << initial_csv.headers
+
+      removed_row = initial_csv.find { |r| r['LDAP_UID'] }
+      logger.info "Row where data will be removed: #{removed_row}"
+      removed_row['START_DATE'] = nil
+      removed_row['END_DATE'] = nil
+      removed_row['EVALUATION_TYPE'] = nil
+      removed_row['COURSE_NAME'] = nil
+      removed_row['LDAP_UID'] = nil
+      removed_row['FIRST_NAME'] = nil
+      removed_row['LAST_NAME'] = nil
+      removed_row['EMAIL_ADDRESS'] = nil
+
+      changed_row = initial_csv.find { |r| r != removed_row }
+      logger.info "Row where data will be changed: #{changed_row}"
+      changed_row['LDAP_UID'] = user[:uid]
+      changed_row['FIRST_NAME'] = user[:first_name]
+      changed_row['LAST_NAME'] = user[:last_name]
+      changed_row['EMAIL_ADDRESS'] = user[:email]
+      changed_row['COURSE_ID'] = "#{changed_row['COURSE_ID']}_GSI"
+      changed_row['START_DATE'] = (Date.today).strftime('%-m/%-d/%y')
+      changed_row['END_DATE'] = (Date.today + 1).strftime('%-m/%-d/%y')
+      changed_row['COURSE_NAME'] = "#{dept.dept_code} 999A LEC 001 INTRO TO SQUARE BIZ"
+      changed_row['DEPT_FORM'] = "#{changed_row['DEPT_FORM']}_LECT"
+      (changed_row['EVALUATION_TYPE'] == 'F') ? (changed_row['EVALUATION_TYPE'] = 'G') : (changed_row['EVALUATION_TYPE'] = 'F')
+      (changed_row['CROSS_LISTED_FLAG'] == 'Y') ? (changed_row['CROSS_LISTED_FLAG'] = '') : (changed_row['CROSS_LISTED_FLAG'] = 'Y')
+
+      initial_csv.each { |r| updated_csv << r.fields }
+    end
+
+    row_to_add = [nil, "#{dept.dept_code} 998AC LEC 001 IT MUST BE MAGIC", nil, nil, user[:uid], user[:first_name],
+                  user[:last_name], user[:email], nil, "#{dept.dept_code}_OH_LA_LA", 'F', nil, nil, nil]
+    Utils.add_csv_row(file_name, row_to_add)
+  end
+
   # Edits data in the merged course confirmations file to maximize the number of rows where 'evaluate' can be set to 'yes' and pass
   # validation. Not intended to replicate edits by department admins, only to maximize the data that can reasonably be included in
   # validation and publishing.
